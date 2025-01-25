@@ -18,6 +18,9 @@ db.init_app(app)
 
 api = Api(app)
 
+# Utility Function
+def is_logged_in():
+    return session.get('user_id') is not None
 class ClearSession(Resource):
 
     def delete(self):
@@ -84,15 +87,38 @@ class CheckSession(Resource):
         
         return {}, 401
 
+
+
 class MemberOnlyIndex(Resource):
     
     def get(self):
-        pass
+        # Check if te user is logged in by confirming user_id in the session
+        if not session.get('user_id'):
+            return {'error': 'Unauthorized'}, 401
+    
+        #Fetch on member_only articles (filter where is_member_only=True)
+        articles = Article.query.filter_by(is_member_only=True).all()
+        return [article.to_dict() for article in articles], 200
+    
 
 class MemberOnlyArticle(Resource):
     
     def get(self, id):
-        pass
+        #check if the user is logged in by confirming 'user_id' is in the session
+        if not session.get('user_id'):
+            return {'error':'Unauthorized user'}, 401
+        #Fetch article by ID and ensure it's member-only article
+        article =Article.query.filter_by(id=id, is_member_only=True).first()
+        if not article:
+            return{'error': 'Article not found or not member-only'}, 404
+        return article.to_dict(), 200
+
+@app.before_request
+def check_if_logged_in():
+    open_endpoints = ['/login', '/check_session', '/articles']
+    if request.path not in open_endpoints and not is_logged_in():
+        return {'error': 'Unauthorized'}, 401
+
 
 api.add_resource(ClearSession, '/clear', endpoint='clear')
 api.add_resource(IndexArticle, '/articles', endpoint='article_list')
